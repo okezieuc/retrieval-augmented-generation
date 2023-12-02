@@ -5,6 +5,15 @@ compatibility_date = "2023-11-21"
 [ai]
 binding = "AI"
 
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "rag-index"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rag-database"
+database_id = "f029bb60-e576-4195-a17f-02d870554466"
+
 # Variable bindings. These are arbitrary, plaintext strings (similar to environment variables)
 # Note: Use secrets to store sensitive data.
 # Docs: https://developers.cloudflare.com/workers/platform/environment-variables
