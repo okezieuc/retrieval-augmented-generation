@@ -1,13 +1,15 @@
 import { Ai } from '@cloudflare/ai';
+import { Hono } from 'hono';
+const app = new Hono();
 
-export default {
-	async fetch(request, env, ctx) {
-		const ai = new Ai(env.AI);
+app.get('/', async (c) => {
+	const ai = new Ai(c.env.AI);
 
-		const answer = await ai.run('@cf/meta/llama-2-7b-chat-int8', {
-			messages: [{ role: 'user', content: `What is the square root of 9?` }],
-		});
+	const answer = await ai.run('@cf/meta/llama-2-7b-chat-int8', {
+		messages: [{ role: 'user', content: `What is the square root of 9?` }],
+	});
 
-		return new Response(JSON.stringify(answer));
-	},
-};
+	return c.json(answer);
+});
+
+export default app;
