@@ -5,11 +5,39 @@ const app = new Hono();
 app.get('/', async (c) => {
 	const ai = new Ai(c.env.AI);
 
-	const answer = await ai.run('@cf/meta/llama-2-7b-chat-int8', {
-		messages: [{ role: 'user', content: `What is the square root of 9?` }],
+	const question = c.req.query('text') || 'What is the square root of 9?';
+
+	const embeddings = await ai.run('@cf/baai/bge-base-en-v1.5', { text: question });
+	const vectors = embeddings.data[0];
+
+	const SIMILARITY_CUTOFF = 0.70;
+	const vectorQuery = await c.env.VECTOR_INDEX.query(vectors, { topK: 1 });
+	const vecIds = vectorQuery.matches.filter((vec) => vec.score > SIMILARITY_CUTOFF).map((vec) => vec.vectorId);
+
+	let notes = [];
+	
+
+	if (vecIds.length) {
+		const query = `SELECT * FROM notes WHERE id IN (${vecIds.join(', ')})`;
+		const { results } = await c.env.DB.prepare(query).bind().all();
+		if (results) {
+			notes = results.map((vec) => vec.text);
+		}
+	}
+
+	const contextMessage = notes.length ? `Context:\n${notes.map((note) => `- ${note}`).join('\n')}` : '';
+
+	const systemPrompt = `When answering the question or responding, use the context provided, if it is provided and relevant.`;
+
+	const { response: answer } = await ai.run('@cf/meta/llama-2-7b-chat-int8', {
+		messages: [
+			...(notes.length ? [{ role: 'system', content: contextMessage }] : []),
+			{ role: 'system', content: systemPrompt },
+			{ role: 'user', content: question },
+		],
 	});
 
-	return c.json(answer);
+	return c.text(answer);
 });
 
 app.post('/notes', async (c) => {
@@ -44,6 +72,10 @@ app.post('/notes', async (c) => {
 	]);
 
 	return c.json({ id, text, inserted });
+});
+
+app.onError((err, c) => {
+	return c.text(err);
 });
 
 export default app;
